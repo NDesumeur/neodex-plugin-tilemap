@@ -1,0 +1,9 @@
+{
+  "pluginId": "neodex.tilemap",
+  "repo": "NDesumeur/neodex-plugin-tilemap",
+  "version": "1.0.0",
+  "sha256": "cff12321d67cb8bc02f97861501b249e82924250799e03b96cff8ca57ac2f097",
+  "approvedAt": "2026-11-13T23:16:59.377Z",
+  "neobase": ">=4.0.0",
+  "signature": "J9vNfE/1nmgLImDfC94yaXQz5aoR/MuWKurohjfgRi4/4xJMeiMMf5ICtx0ULpFqNSmki0K5DEl+W1Lz0YwaBA=="
+}

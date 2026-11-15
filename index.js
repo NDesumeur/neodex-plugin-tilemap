@@ -9,7 +9,7 @@ const HTML = `<div class="appWrap wide">
     <div class="tmSide">
       <div class="sysCard"><b>OUTILS</b><div class="tmTools" id="tmTools"></div></div>
       <div class="sysCard"><b>CALQUE</b><div class="tmTools" id="tmLayers"></div></div>
-      <div class="sysCard"><b>TUILES</b><canvas id="tmPal" aria-label="Tuiles"></canvas><span class="hint" id="tmTile"></span></div>
+      <div class="sysCard"><b>TUILES</b><div class="tmTools tmSets" id="tmSets"></div><canvas id="tmPal" aria-label="Tuiles"></canvas><span class="hint" id="tmTile"></span></div>
     </div>
     <div class="tmBox"><canvas id="tmCanvas" role="img" aria-label="Carte en tuiles"></canvas></div>
   </div>
@@ -17,7 +17,7 @@ const HTML = `<div class="appWrap wide">
 </div>`;
 const CSS = `.tmBar{flex-wrap:wrap;gap:8px;margin-bottom:14px}.tmBar select{width:auto;flex:0 1 auto;min-width:0}.tmBar .tmSp{flex:1}
 .tmMain{display:flex;gap:18px;align-items:flex-start;flex-wrap:wrap}
-.tmSide{display:flex;flex-direction:column;gap:12px;width:236px;flex:0 0 auto}
+.tmSide{display:flex;flex-direction:column;gap:12px;width:clamp(236px,17vw,330px);flex:0 0 auto}
 .tmSide .sysCard{display:flex;flex-direction:column;gap:8px}
 .tmTools{display:flex;flex-wrap:wrap;gap:6px}
 #tmPal{width:100%;height:auto;image-rendering:pixelated;cursor:pointer}
@@ -68,7 +68,39 @@ function tmTiles() {
     ['Porte', g => { P(g, '#6a4422', 3, 1, 10, 15); P(g, '#8a5a2a', 4, 2, 8, 14); for (const x of [6, 9]) P(g, '#6a4422', x, 2, 1, 14); P(g, '#ffe070', 10, 9); }],
     ['Fenêtre', g => { P(g, '#5a3a18', 2, 3, 12, 11); P(g, '#8ad0ff', 3, 4, 10, 9); P(g, '#5a3a18', 7, 4, 2, 9); P(g, '#5a3a18', 3, 8, 10, 1); P(g, '#e0f6ff', 4, 5, 2, 1); }],
   ];
-  return [...GROUND.map(t => [...t, false]), ...OBJ.map(t => [...t, true])].map(([name, draw, obj], i) => {
+  const old = n => OBJ.find(t => t[0] === n)[1];
+  const EXTRA = [  // [nom, dessin, objet, jeu] : ajoutées après les anciennes pour que les cartes déjà faites gardent leurs tuiles
+    ['Sol de grotte', (g, r) => { base('#3a3038', ['#2e262e', '#463c44', '#52464e'], 40)(g, r); for (let i = 0; i < 3; i++) { const x = r() * 14 | 0, y = r() * 14 | 0; P(g, '#5e5260', x, y, 2, 1); P(g, '#241c26', x, y + 1, 2, 1); } }, false, 'grotte'],
+    ['Roche de grotte', g => { P(g, '#1c1420', 0, 0, 16, 16); for (const [x, y, w, h] of [[0, 0, 7, 6], [8, 1, 8, 5], [1, 7, 6, 9], [8, 7, 8, 8]]) { P(g, '#4a3e4c', x, y, w, h); P(g, '#5e5060', x, y, w, 1); P(g, '#30263a', x, y + h - 1, w, 1); } }, false, 'grotte'],
+    ['Gravier', base('#5a5258', ['#7a7078', '#46404a', '#8a828a'], 70), false, 'grotte'],
+    ['Eau souterraine', waves('#14304a', '#2a6a8a'), false, 'grotte'],
+    ['Route', (g, r) => { base('#3a3a42', ['#44444c', '#32323a'], 30)(g, r); P(g, '#f0e070', 1, 7, 5, 2); P(g, '#f0e070', 10, 7, 5, 2); }, false, 'ville'],
+    ['Passage piéton', g => { P(g, '#3a3a42', 0, 0, 16, 16); for (const x of [1, 5, 9, 13]) P(g, '#f0f0f0', x, 1, 2, 14); }, false, 'ville'],
+    ['Trottoir', g => { P(g, '#9a9aa4', 0, 0, 16, 16); P(g, '#7a7a84', 0, 0, 16, 1); P(g, '#7a7a84', 0, 8, 16, 1); P(g, '#7a7a84', 0, 0, 1, 16); P(g, '#7a7a84', 8, 0, 1, 16); P(g, '#b4b4be', 1, 1, 7, 1); P(g, '#b4b4be', 9, 9, 7, 1); P(g, '#b4b4be', 9, 1, 7, 1); P(g, '#b4b4be', 1, 9, 7, 1); }, false, 'ville'],
+    ['Carrelage', g => { for (let y = 0; y < 16; y += 4) for (let x = 0; x < 16; x += 4) P(g, (x + y) % 8 ? '#a89880' : '#e0d8c8', x, y, 4, 4); }, false, 'ville'],
+    ['Neige tassée', (g, r) => { base('#d0dcea', ['#bccbdc', '#e4ecf6'], 40)(g, r); for (const [x, y] of [[3, 3], [6, 7], [3, 11], [11, 4], [12, 12]]) P(g, '#a8b8cc', x, y, 2, 2); }, false, 'neige'],
+    ['Neige et herbe', (g, r) => { grass(g, r); for (let i = 0; i < 6; i++) disc(g, '#eef4fa', r() * 16 | 0, r() * 16 | 0, 1 + (r() * 2 | 0)); }, false, 'neige'],
+    ['Glace craquelée', g => { P(g, '#9ad4ec', 0, 0, 16, 16); for (const [x, y] of [[2, 2], [3, 3], [4, 3], [5, 4], [6, 5], [6, 6], [7, 7], [9, 7], [10, 6], [11, 6], [12, 5], [7, 8], [7, 9], [6, 10], [6, 11], [5, 12], [10, 12], [11, 13]]) { P(g, '#6ab0cc', x, y); P(g, '#e8f8ff', x, y - 1); } }, false, 'neige'],
+    ['Stalagmite', g => { for (let y = 2; y < 16; y++) { const w = 1 + (y - 2) / 3 | 0; P(g, '#7a6a7a', 8 - w, y, w, 1); P(g, '#4a3c4a', 8, y, w, 1); } P(g, '#9a8a9a', 7, 3, 1, 4); }, true, 'grotte'],
+    ['Minerai d’or', g => { old('Rocher')(g); for (const [x, y] of [[5, 9], [9, 8], [8, 12], [11, 11]]) { P(g, '#ffd04a', x, y, 2, 2); P(g, '#fff0a0', x, y); } }, true, 'grotte'],
+    ['Champignons lumineux', g => { for (const [x, y, r] of [[5, 8, 3], [11, 6, 2]]) { P(g, '#c8e8e0', x, y + 1, 1, 15 - y - 1); disc(g, '#3ac8e0', x, y, r); P(g, '#a0f4ff', x - 1, y - 1); } }, true, 'grotte'],
+    ['Os', g => { P(g, '#f0e8d8', 4, 7, 8, 2); for (const [x, y] of [[3, 6], [3, 9], [12, 6], [12, 9]]) disc(g, '#f0e8d8', x, y, 1); P(g, '#c8bca8', 4, 9, 8, 1); }, true, 'grotte'],
+    ['Wagonnet', g => { P(g, '#5a3a1e', 2, 6, 12, 6); P(g, '#8a5a2a', 2, 6, 12, 1); P(g, '#5a5a66', 2, 11, 12, 1); for (const x of [5, 11]) disc(g, '#2e2e36', x, 13, 1); P(g, '#ffd04a', 4, 4, 3, 2); P(g, '#8a8a94', 8, 4, 4, 2); }, true, 'grotte'],
+    ['Lampadaire', g => { P(g, '#3a3a48', 7, 4, 2, 10); P(g, '#3a3a48', 5, 14, 6, 2); P(g, '#3a3a48', 5, 1, 6, 2); P(g, '#ffe070', 6, 3, 4, 2); }, true, 'ville'],
+    ['Banc', g => { P(g, '#8a5a2a', 1, 4, 14, 2); P(g, '#a8743a', 1, 8, 14, 2); P(g, '#3a3a48', 2, 6, 1, 2); P(g, '#3a3a48', 13, 6, 1, 2); P(g, '#3a3a48', 2, 10, 2, 4); P(g, '#3a3a48', 12, 10, 2, 4); }, true, 'ville'],
+    ['Poubelle', g => { P(g, '#4a7a4a', 4, 5, 8, 10); P(g, '#5a9a5a', 3, 3, 10, 2); P(g, '#3a6a3a', 6, 6, 1, 8); P(g, '#3a6a3a', 9, 6, 1, 8); P(g, '#3a3a48', 7, 2, 2, 1); }, true, 'ville'],
+    ['Boîte aux lettres', g => { P(g, '#6a4422', 7, 9, 2, 6); P(g, '#d03a2a', 3, 3, 10, 6); P(g, '#e85a40', 3, 3, 10, 1); P(g, '#401010', 5, 5, 6, 1); P(g, '#ffe070', 13, 2, 1, 4); }, true, 'ville'],
+    ['Pot de fleurs', g => { P(g, '#c0603a', 4, 10, 8, 5); P(g, '#d87a50', 3, 9, 10, 2); disc(g, '#3a8a32', 8, 6, 3); for (const [x, y, c] of [[6, 4, '#ff7ab0'], [10, 5, '#ffe14a'], [8, 7, '#ffffff']]) P(g, c, x, y); }, true, 'ville'],
+    ['Bonhomme de neige', g => { disc(g, '#f4f8ff', 8, 11, 4); disc(g, '#f4f8ff', 8, 5, 3); P(g, '#c8d4e4', 5, 14, 7, 1); P(g, '#1a1020', 7, 4); P(g, '#1a1020', 9, 4); P(g, '#ff8a1a', 9, 6, 2, 1); P(g, '#2a2a34', 6, 0, 5, 2); P(g, '#1a1020', 8, 10); P(g, '#1a1020', 8, 12); P(g, '#d03a2a', 6, 8, 5, 1); }, true, 'neige'],
+    ['Sapin enneigé', g => { old('Sapin')(g); for (let y = 1; y < 14; y++) if ((y - 1) % 4 === 3 || y === 1) { const w = 1 + (y - 1) % 4 + (y - 1) / 4 | 0; P(g, '#f4f8ff', 8 - w, y, w + 1, 1); } }, true, 'neige'],
+    ['Rocher enneigé', g => { old('Rocher')(g); P(g, '#f4f8ff', 5, 5, 6, 1); P(g, '#f4f8ff', 4, 6, 8, 1); P(g, '#dce8f4', 3, 7, 3, 1); P(g, '#dce8f4', 10, 7, 3, 1); }, true, 'neige'],
+    ['Bloc de glace', g => { P(g, '#8ad0f0', 2, 4, 12, 11); P(g, '#c8f0ff', 2, 4, 12, 2); P(g, '#ffffff', 4, 7, 1, 4); P(g, '#5aa8d0', 13, 4, 1, 11); P(g, '#5aa8d0', 2, 14, 12, 1); }, true, 'neige'],
+    ['Feu de camp', g => { P(g, '#6a4422', 3, 12, 10, 2); P(g, '#8a5a2a', 5, 11, 6, 1); disc(g, '#ff8a1a', 8, 8, 3); P(g, '#ffe070', 7, 7, 2, 3); P(g, '#ff8a1a', 8, 3, 1, 2); for (const x of [1, 13]) P(g, '#8a8a94', x, 13, 2, 2); }, true, 'neige'],
+  ];
+  const SET = { nature: 'Herbe,Herbe fleurie,Terre,Chemin,Sable,Eau,Eau profonde,Arbre,Buisson,Fleurs,Herbes hautes,Rocher,Souche,Champignon,Clôture,Panneau',
+    grotte: 'Pierre,Lave,Mur de pierre,Rocher,Coffre,Torche,Cristal,Champignon', ville: 'Pavés,Planches,Briques,Toit,Chemin,Coffre,Tonneau,Clôture,Panneau,Porte,Fenêtre', neige: 'Glace,Neige,Eau,Eau profonde,Sapin,Rocher' };
+  const setsOf = n => Object.keys(SET).filter(k => SET[k].split(',').includes(n));
+  return [...GROUND.map(t => [...t, false, setsOf(t[0])]), ...OBJ.map(t => [...t, true, setsOf(t[0])]), ...EXTRA.map(([n, d, o, s]) => [n, d, o, [s]])].map(([name, draw, obj, sets], i) => {
     const c = document.createElement('canvas'); c.width = c.height = TM_T; const g = c.getContext('2d');
     let s = 977 + i * 131; const r = () => (s = (s * 16807) % 2147483647) / 2147483647;
     draw(g, r);
@@ -77,7 +109,7 @@ function tmTiles() {
       for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) if (!a(y * 16 + x) && ((x > 0 && a(y * 16 + x - 1)) || (x < 15 && a(y * 16 + x + 1)) || (y > 0 && a(y * 16 + x - 16)) || (y < 15 && a(y * 16 + x + 16)))) out.push([x, y]);
       for (const [x, y] of out) P(g, '#1a1020', x, y);
     }
-    return { name, c, obj };
+    return { name, c, obj, sets };
   });
 }
 // remplit la zone de même tuile autour de la case i ; rend le nombre de cases changées
@@ -404,12 +436,14 @@ export default async function (ctx) {
   const data = { maps: [], cur: 0, ...(await doc('cartes')) };
   if (!data.maps.length) data.maps.push(blank('Ma carte', 32, 20));
   let timer; const keep = () => { clearTimeout(timer); timer = setTimeout(() => folder.write('cartes', data).catch(e => toast('Pas enregistré : ' + e.message, true)), 400); };
-  const st = { tool: 'pen', layer: 0, tile: 1, grid: true, undo: [], redo: [], hover: null, drag: null, btn: 0, last: null };
+  const st = { set: 'tout', tool: 'pen', layer: 0, tile: 1, grid: true, undo: [], redo: [], hover: null, drag: null, btn: 0, last: null };
   const map = () => data.maps[data.cur] || data.maps[0];
-  const cv = $('tmCanvas'), g = cv.getContext('2d'), pal = $('tmPal'), PC = 6, PS = 18;
+  const cv = $('tmCanvas'), g = cv.getContext('2d'), pal = $('tmPal'), PC = 8, PS = 18;
+  const SETS = [['tout', 'TOUT'], ['nature', 'NATURE'], ['grotte', 'GROTTE'], ['ville', 'VILLE'], ['neige', 'NEIGE']];
+  let vis = [];  // les numéros de tuile (dès 1) montrés dans la palette, dans l'ordre
 
   function fit() {  // la carte au plus grand qui tient (facteur entier dès 2)
-    const m = map(), aw = Math.max(240, cv.parentElement.clientWidth - 16), ah = Math.max(240, innerHeight * .7);
+    const m = map(), aw = Math.max(240, cv.parentElement.clientWidth - 16), ah = Math.max(240, innerHeight - 230);  // la carte tient dans la fenêtre sous la barre
     let s = Math.min(aw / (m.w * TS), ah / (m.h * TS)); if (s >= 2) s = Math.floor(s);  // entre 1 et 2 : grossi quand même, au prix de pixels un peu inégaux
     cv.style.width = Math.round(m.w * TS * s) + 'px';
   }
@@ -427,11 +461,14 @@ export default async function (ctx) {
     if (st.hover) { const [x, y] = st.hover; g.fillStyle = '#ffffff'; for (const [a, b, w, h] of [[0, 0, TS, 1], [0, TS - 1, TS, 1], [0, 0, 1, TS], [TS - 1, 0, 1, TS]]) g.fillRect(x * TS + a, y * TS + b, w, h); }
   }
   function drawPal() {
-    pal.width = PC * PS; pal.height = Math.ceil(TILES.length / PC) * PS; const p = pal.getContext('2d');
+    const pick = TILES.map((t, i) => i + 1).filter(n => st.set === 'tout' || TILES[n - 1].sets.includes(st.set));
+    vis = [...pick.filter(n => !TILES[n - 1].obj), ...pick.filter(n => TILES[n - 1].obj)];
+    $('tmSets').replaceChildren(...SETS.map(([k, n]) => { const x = el('button', 'btn' + (st.set === k ? ' main' : ''), n); x.onclick = () => { st.set = k; drawPal(); }; return x; }));
+    pal.width = PC * PS; pal.height = Math.ceil(vis.length / PC) * PS; const p = pal.getContext('2d');
     p.fillStyle = '#0c0a12'; p.fillRect(0, 0, pal.width, pal.height);
-    TILES.forEach((t, i) => { const x = i % PC * PS + 1, y = (i / PC | 0) * PS + 1;
-      if (i + 1 === st.tile) { p.fillStyle = '#5ae07a'; p.fillRect(x - 1, y - 1, PS, PS); }
-      p.fillStyle = '#2a2234'; p.fillRect(x, y, 16, 16); p.drawImage(t.c, x, y); });
+    vis.forEach((n, i) => { const x = i % PC * PS + 1, y = (i / PC | 0) * PS + 1;
+      if (n === st.tile) { p.fillStyle = '#5ae07a'; p.fillRect(x - 1, y - 1, PS, PS); }
+      p.fillStyle = '#2a2234'; p.fillRect(x, y, 16, 16); p.drawImage(TILES[n - 1].c, x, y); });
     $('tmTile').textContent = TILES[st.tile - 1].name + (TILES[st.tile - 1].obj ? ' (objet)' : ' (sol)');
   }
   const TOOLS = [['pen', 'CRAYON', 'p'], ['fill', 'REMPLIR', 'f'], ['rect', 'RECTANGLE', 'r'], ['erase', 'GOMME', 'e'], ['pick', 'PIPETTE', 'i']];
@@ -470,7 +507,7 @@ export default async function (ctx) {
     if (st.drag) keep(); st.drag = null; draw();
   };
   cv.onpointerleave = () => { st.hover = null; draw(); };
-  pal.onclick = e => { const b = pal.getBoundingClientRect(), i = Math.floor((e.clientX - b.left) / b.width * PC) + Math.floor((e.clientY - b.top) / b.height * pal.height / PS) * PC; if (TILES[i]) select(i + 1); };
+  pal.onclick = e => { const b = pal.getBoundingClientRect(), i = Math.floor((e.clientX - b.left) / b.width * PC) + Math.floor((e.clientY - b.top) / b.height * pal.height / PS) * PC; if (vis[i]) select(vis[i]); };
   function undo(redo) { const from = redo ? st.redo : st.undo, to = redo ? st.undo : st.redo, s = from.pop(); if (!s) return; const m = map(); to.push(m.l); m.l = s; keep(); draw(); }
   document.addEventListener('keydown', e => {
     if (!on() || /^(INPUT|SELECT|TEXTAREA)$/.test(e.target?.tagName)) return;
@@ -506,11 +543,13 @@ export default async function (ctx) {
     const b = Array(12).fill(0); tmRect(b, 4, 3, 2, 1, 0, 7); if (b.filter(v => v === 7).length !== 9 || b[0] !== 0) bad.push('rectangle');
     for (const t of TILES) { const d = t.c.getContext('2d').getImageData(0, 0, 16, 16).data; let n = 0, soft = 0; for (let i = 3; i < d.length; i += 4) { n += d[i] === 255; soft += d[i] > 0 && d[i] < 255; }
       if (soft || (t.obj ? n < 20 || n === 256 : n !== 256)) bad.push('tuile ' + t.name); }
+    for (const k of ['nature', 'grotte', 'ville', 'neige']) { const n = TILES.filter(t => t.sets.includes(k)); if (n.filter(t => t.obj).length < 5 || n.filter(t => !t.obj).length < 4) bad.push('jeu ' + k); }
+    if (TILES[16].name !== 'Arbre' || TILES[31].name !== 'Fenêtre' || TILES.length < 50) bad.push('numéros des tuiles');  // les cartes déjà faites gardent les leurs
     const s = tiled(blank('t', 2, 2), { width: 128, height: 64 }); if (s.layers[1].data.length !== 4 || s.tilesets[0].tilecount !== TILES.length || s.tilesets[0].columns !== 8) bad.push('export');
     console.assert(!bad.length, 'tilemap', bad); view.dataset.selfcheck = bad.join(' | ') || 'ok';
   }
   maps(); bar(); drawPal(); draw();
   addEventListener('resize', fit);
   ctx.onOpen(() => { fit(); draw(); });
-  cv.__t = { map, st, tiles: TILES.length, firstObj: TILES.findIndex(t => t.obj) };
+  cv.__t = { map, st, tiles: TILES.length, firstObj: TILES.findIndex(t => t.obj), pc: PC, at: n => vis.indexOf(n), sets: k => { st.set = k; drawPal(); return vis.length; } };
 }

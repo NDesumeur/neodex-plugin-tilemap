@@ -23,3 +23,7 @@ P crayon · F remplir · R rectangle · E gomme · I pipette · G grille · 1 et
 ## Installer
 
 Dans NeoDex : **NeoStore → À découvrir → Tilemap → Installer**.
+
+## Jeux de tuiles
+
+Au-dessus de la palette, choisis un jeu : **Nature**, **Grotte** (sol et roche de grotte, gravier, eau souterraine, stalagmite, minerai d’or, champignons lumineux, os, wagonnet), **Ville** (route, passage piéton, trottoir, carrelage, lampadaire, banc, poubelle, boîte aux lettres, pot de fleurs) ou **Neige** (neige tassée, neige et herbe, glace craquelée, bonhomme de neige, sapin enneigé, rocher enneigé, bloc de glace, feu de camp). **Tout** les montre toutes. Les nouvelles tuiles sont ajoutées à la fin de la planche : tes cartes déjà faites ne changent pas.

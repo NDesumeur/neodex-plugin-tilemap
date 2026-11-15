@@ -4,7 +4,7 @@ module.exports = async ({ pj, sleep }) => {
   const r = await pj(`(() => {
     const cv = document.getElementById('tmCanvas'), pal = document.getElementById('tmPal'), T = cv.__t, map = T.map;
     const at = (type, fx, fy) => { const b = cv.getBoundingClientRect(); cv.dispatchEvent(new PointerEvent(type, { clientX: b.left + b.width * fx, clientY: b.top + b.height * fy, button: 0, buttons: type === 'pointerup' ? 0 : 1, pointerId: 1, bubbles: true })); };
-    const tile = i => { const b = pal.getBoundingClientRect(), rows = pal.height / 18; pal.onclick({ clientX: b.left + b.width * ((i % 6) + .5) / 6, clientY: b.top + b.height * (Math.floor(i / 6) + .5) / rows }); };
+    const tile = n => { const i = T.at(n + 1), C = T.pc, b = pal.getBoundingClientRect(), rows = pal.height / 18; pal.onclick({ clientX: b.left + b.width * ((i % C) + .5) / C, clientY: b.top + b.height * (Math.floor(i / C) + .5) / rows }); };  // n : numéro de tuile dès 0
     const tool = n => [...document.querySelectorAll('#tmTools button')].find(b => b.textContent.includes(n)).click();
     tile(2); tool('REMPLIR'); at('pointerdown', .5, .5); at('pointerup', .5, .5);
     const filled = map().l[0].every(v => v === 3);
@@ -17,6 +17,14 @@ module.exports = async ({ pj, sleep }) => {
   if (!r.filled) throw new Error('le remplissage n’a pas couvert la carte');
   if (!r.undone) throw new Error('Ctrl+Z n’a pas annulé');
   if (r.trees !== r.want || r.layer !== 1 || !r.sol) throw new Error('rectangle d’arbres : ' + JSON.stringify(r));
+  const sets = await pj(`(() => { const T = document.getElementById('tmCanvas').__t, out = {}; for (const k of ['grotte', 'ville', 'neige', 'tout']) out[k] = T.sets(k); return out; })()`);
+  if (!(sets.grotte >= 10 && sets.ville >= 10 && sets.neige >= 8 && sets.tout === sets.tout)) throw new Error('jeux de tuiles : ' + JSON.stringify(sets));
+  const over = await pj(`[...document.querySelectorAll('.appWrap *')].filter(e => e.getBoundingClientRect().right > innerWidth + 1).length`);
+  if (over) throw new Error(over + ' élément(s) débordent à droite');
+  const out = await pj(`[...document.querySelectorAll('.tmSide .sysCard')].flatMap(c => { const r = c.getBoundingClientRect(); return [...c.querySelectorAll('.btn')].filter(x => x.getBoundingClientRect().right > r.right + 1).map(x => x.textContent); })`);
+  if (out.length) throw new Error('boutons qui sortent de leur carte : ' + out.join(', '));
+  const fits = await pj(`document.getElementById('tmCanvas').getBoundingClientRect().height <= innerHeight - 150`);
+  if (!fits) throw new Error('la carte est plus haute que la fenêtre');
   // un petit village pour la capture du NeoStore (herbe 1, fleurie 2, chemin 4, sable 5, eau 6-7, pavés 12, briques 14, toit 16 ; objets 17 et plus)
   await pj(`(() => {
     const cv = document.getElementById('tmCanvas'), m = cv.__t.map(), W = m.w, S = m.l[0], O = m.l[1], set = (a, x, y, v) => { if (x >= 0 && y >= 0 && x < W && y < m.h) a[y * W + x] = v; };
@@ -31,5 +39,5 @@ module.exports = async ({ pj, sleep }) => {
     for (let x = 0; x < 9; x++) set(O, x, 12, 27); for (const [x, y, v] of [[19, 9, 19], [5, 18, 20], [9, 14, 20], [15, 13, 21], [18, 13, 22], [29, 17, 22], [27, 9, 24], [13, 17, 23], [30, 12, 30], [17, 10, 20]]) set(O, x, y, v);
     cv.__t.st.hover = null; document.querySelectorAll('#tmLayers button')[1].click(); 0; })()`);
   await sleep(500);
-  return 'remplissage, annulation, ' + r.trees + ' arbres sur le calque Objets';
+  return 'remplissage, annulation, ' + r.trees + ' arbres sur le calque Objets, jeux de tuiles ' + JSON.stringify(sets);
 };

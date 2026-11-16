@@ -154,5 +154,9 @@
  "Sapin enneigé": "Snowy fir",
  "Rocher enneigé": "Snowy rock",
  "Bloc de glace": "Ice block",
- "Feu de camp": "Campfire"
+ "Feu de camp": "Campfire",
+ "Herbe,Herbe fleurie,Terre,Chemin,Sable,Eau,Eau profonde,Arbre,Buisson,Fleurs,Herbes hautes,Rocher,Souche,Champignon,Clôture,Panneau": "Grass,Flowery grass,Dirt,Path,Sand,Water,Deep water,Tree,Bush,Flowers,Tall grass,Rock,Stump,Mushroom,Fence,Sign",
+ "Pierre,Lave,Mur de pierre,Rocher,Coffre,Torche,Cristal,Champignon": "Stone,Lava,Stone wall,Rock,Chest,Torch,Crystal,Mushroom",
+ "Pavés,Planches,Briques,Toit,Chemin,Coffre,Tonneau,Clôture,Panneau,Porte,Fenêtre": "Cobbles,Planks,Bricks,Roof,Path,Chest,Barrel,Fence,Sign,Door,Window",
+ "numéros des tuiles": "tile numbers"
 }

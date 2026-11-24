@@ -1,7 +1,7 @@
 {
   "id": "neodex.tilemap",
   "name": "Tilemap",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "author": "NDesumeur",
   "description": "Dessine des cartes en tuiles 16×16 pour tes jeux 2D : 32 tuiles en pixel art (sol, eau, murs, arbres, coffres, portes…), deux calques, crayon, remplissage, rectangle, gomme, pipette et annulation. Exporte en PNG ou au format Tiled (.tmj et sa planche de tuiles), lisible par Tiled, Godot, Phaser ou LDtk. Trois nouveaux jeux de tuiles (grotte, ville, neige : 26 tuiles de plus) et un tri de la palette par jeu ; la colonne d'outils et la carte suivent la taille de l'écran.",
   "icon": "icon.png",

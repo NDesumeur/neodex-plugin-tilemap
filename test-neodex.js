@@ -39,5 +39,8 @@ module.exports = async ({ pj, sleep }) => {
     for (let x = 0; x < 9; x++) set(O, x, 12, 27); for (const [x, y, v] of [[19, 9, 19], [5, 18, 20], [9, 14, 20], [15, 13, 21], [18, 13, 22], [29, 17, 22], [27, 9, 24], [13, 17, 23], [30, 12, 30], [17, 10, 20]]) set(O, x, y, v);
     cv.__t.st.hover = null; document.querySelectorAll('#tmLayers button')[1].click(); 0; })()`);
   await sleep(500);
-  return 'remplissage, annulation, ' + r.trees + ' arbres sur le calque Objets, jeux de tuiles ' + JSON.stringify(sets);
+  // les bords automatiques : les rives du lac et du chemin, et autant de tuiles composées dans l'export Tiled
+  const au = await pj(`(() => { const T = document.getElementById('tmCanvas').__t, m = T.map(); let n = 0; for (let i = 0; i < m.l[0].length; i++) n += T.edges(i) > 0; return { n, extra: T.bake(m).extra.length }; })()`);
+  if (!(au.n > 20 && au.extra > 5)) throw new Error('bords auto : ' + JSON.stringify(au));
+  return 'bords auto sur ' + au.n + ' cases (' + au.extra + ' tuiles composées), remplissage, annulation, ' + r.trees + ' arbres sur le calque Objets, jeux de tuiles ' + JSON.stringify(sets);
 };

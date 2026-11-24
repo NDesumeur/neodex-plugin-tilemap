@@ -4,6 +4,10 @@ Un éditeur de cartes en tuiles pour tes jeux 2D.
 
 *English version: [README.en.md](README.en.md)*
 
+## Bords automatiques (nouveau en 1.2.0)
+
+Les sols se raccordent tout seuls : herbe sur la terre, sable sur l'eau, rives dentelées et coins fermés, aussi dans les exports PNG et Tiled.
+
 ## Ce qu’il fait
 
 - **32 tuiles 16×16** dessinées en pixel art : herbe, terre, chemin, sable, eau, glace, neige, lave, pierre, pavés, planches, briques, murs, toit ; et des objets détourés : arbres, sapin, buisson, fleurs, rocher, coffre, tonneau, clôture, panneau, torche, cristal, porte, fenêtre…
@@ -14,7 +18,11 @@ Un éditeur de cartes en tuiles pour tes jeux 2D.
 
 ## Raccourcis
 
-P crayon · F remplir · R rectangle · E gomme · I pipette · G grille · 1 et 2 : calque.
+P crayon · F remplir · R rectangle · E gomme · I pipette · G grille · A bords auto · 1 et 2 : calque.
+
+## Bords automatiques (1.2.0)
+
+Le bouton **BORDS AUTO** (touche A) raccorde les sols tout seuls : l’herbe déborde sur la terre et le chemin, le sable sur l’eau, l’eau sur l’eau profonde, avec un bord dentelé et une petite ombre ; les coins se ferment aussi. Les sols bâtis (pavés, briques, murs, toit…) restent nets. Le réglage est gardé pour chaque carte. L’export PNG montre les bords, et l’export Tiled ajoute à la planche une tuile composée pour chaque case de bord : Tiled montre la même carte.
 
 ## Autorisations
 

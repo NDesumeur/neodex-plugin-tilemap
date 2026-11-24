@@ -13,7 +13,7 @@ const HTML = `<div class="appWrap wide">
     </div>
     <div class="tmBox"><canvas id="tmCanvas" role="img" aria-label="Carte en tuiles"></canvas></div>
   </div>
-  <div class="hint tmHelp">Touches : P crayon · F remplir · R rectangle · E gomme · I pipette · G grille · 1 et 2 : calque. Le calque Objets se pose par-dessus le sol (arbres, coffres, portes…). EXPORT TILED donne la carte (.tmj) et sa planche de tuiles (.png), à ouvrir dans Tiled, Godot, Phaser ou LDtk.</div>
+  <div class="hint tmHelp">Touches : P crayon · F remplir · R rectangle · E gomme · I pipette · G grille · A bords auto · 1 et 2 : calque. Avec les bords auto, l'herbe, le sable, la neige… débordent sur le sol voisin, et les rives se dessinent toutes seules. Le calque Objets se pose par-dessus le sol (arbres, coffres, portes…). EXPORT TILED donne la carte (.tmj) et sa planche de tuiles (.png), à ouvrir dans Tiled, Godot, Phaser ou LDtk.</div>
 </div>`;
 const CSS = `.tmBar{flex-wrap:wrap;gap:8px;margin-bottom:14px}.tmBar select{width:auto;flex:0 1 auto;min-width:0}.tmBar .tmSp{flex:1}
 .tmMain{display:flex;gap:18px;align-items:flex-start;flex-wrap:wrap}
@@ -111,6 +111,32 @@ function tmTiles() {
     }
     return { name, c, obj, sets };
   });
+}
+// les bords automatiques : le sol de rang plus haut (l'herbe sur la terre, le sable sur l'eau…) déborde sur la case voisine
+const TM_RANK = { 'Eau profonde': 0, 'Eau': 1, 'Eau souterraine': 1, 'Lave': 1, 'Glace': 2, 'Glace craquelée': 2, 'Sable': 3, 'Gravier': 4, 'Sol de grotte': 4, 'Terre': 5, 'Chemin': 6, 'Herbe': 7, 'Herbe fleurie': 7, 'Neige et herbe': 7, 'Neige': 8, 'Neige tassée': 8 };
+const TM_D = [3, 4, 4, 3, 2, 3, 4, 5, 4, 3, 3, 4, 3, 2, 3, 4];  // la profondeur dentelée du bord, colonne par colonne
+const TM_DIR = [[0, -1], [1, 0], [0, 1], [-1, 0], [1, -1], [1, 1], [-1, 1], [-1, -1]];  // N E S O, puis les coins NE SE SO NO
+function tmBand(d, x, y) {
+  if (x < 0 || y < 0 || x > 15 || y > 15) return false;
+  return [y < TM_D[x], 15 - x < TM_D[y], 15 - y < TM_D[15 - x], x < TM_D[15 - y], (15 - x) ** 2 + y ** 2 <= 12, (15 - x) ** 2 + (15 - y) ** 2 <= 12, x ** 2 + (15 - y) ** 2 <= 12, x ** 2 + y ** 2 <= 12][d];
+}
+function tmOverlay(tile, d) {  // la tuile voisine, découpée en bande dentelée, avec une ligne d'ombre sur le bord
+  const c = document.createElement('canvas'); c.width = c.height = TM_T; const g = c.getContext('2d'), src = tile.c.getContext('2d').getImageData(0, 0, 16, 16).data, im = g.createImageData(16, 16), o = im.data;
+  for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) { const i = (y * 16 + x) * 4;
+    if (tmBand(d, x, y)) { o[i] = src[i]; o[i + 1] = src[i + 1]; o[i + 2] = src[i + 2]; o[i + 3] = 255; }
+    else if (tmBand(d, x - 1, y) || tmBand(d, x + 1, y) || tmBand(d, x, y - 1) || tmBand(d, x, y + 1)) { o[i + 3] = 70; } }
+  g.putImageData(im, 0, 0); return c;
+}
+// les recouvrements à poser sur la case i du sol : [{v, d}] du rang le plus bas au plus haut
+function tmEdges(L, w, h, i, rank) {
+  const r0 = rank[L[i]] ?? -1, x = i % w, y = i / w | 0, out = []; if (r0 < 0) return out;  // les sols bâtis (pavés, murs…) restent nets
+  const at = (dx, dy) => { const X = x + dx, Y = y + dy; return X < 0 || Y < 0 || X >= w || Y >= h ? 0 : L[Y * w + X]; };
+  const hi = v => (rank[v] ?? -1) > r0;
+  for (let d = 0; d < 4; d++) { const v = at(...TM_DIR[d]); if (hi(v)) out.push({ v, d }); }
+  for (let d = 4; d < 8; d++) { const [dx, dy] = TM_DIR[d], v = at(dx, dy); if (!hi(v)) continue;
+    const a = at(dx, 0), b = at(0, dy); if ((rank[a] ?? -1) >= rank[v] || (rank[b] ?? -1) >= rank[v]) continue;  // déjà couvert par un bord
+    out.push({ v, d }); }
+  return out.sort((p, q) => rank[p.v] - rank[q.v] || p.d - q.d);
 }
 // remplit la zone de même tuile autour de la case i ; rend le nombre de cases changées
 function tmFlood(a, w, h, i, v) {
@@ -432,6 +458,10 @@ export default async function (ctx) {
     emblem: ['kkkkkkkkkkkk', 'kaaakwwwkaak', 'kaaakwwwkaak', 'kaaakwwwkaak', 'kkkkkkkkkkkk', 'kwwwkaaakbbk', 'kwwwkaaakbbk', 'kwwwkaaakbbk', 'kkkkkkkkkkkk', 'kaaakbbbkwwk', 'kaaakbbbkwwk', 'kkkkkkkkkkkk'],
     icons: [[/^NOUVELLE/, 'plus']] });
   const TILES = tmTiles(), TS = TM_T;
+  const RANK = {}; TILES.forEach((t, i) => { if (!t.obj && TM_RANK[t.name] !== undefined) RANK[i + 1] = TM_RANK[t.name]; });
+  const OV = new Map(), ov = (v, d) => { const k = v * 8 + d; if (!OV.has(k)) OV.set(k, tmOverlay(TILES[v - 1], d)); return OV.get(k); };
+  const autoOn = m => m.auto !== false;
+  const edgesAt = (m, L, i) => autoOn(m) ? tmEdges(L, m.w, m.h, i, RANK) : [];
   const blank = (name, w, h) => ({ name, w, h, l: [Array(w * h).fill(1), Array(w * h).fill(0)] });
   const data = { maps: [], cur: 0, ...(await doc('cartes')) };
   if (!data.maps.length) data.maps.push(blank('Ma carte', 32, 20));
@@ -454,7 +484,9 @@ export default async function (ctx) {
     const R = Array.isArray(st.drag) ? st.drag : null, inR = R && ((x, y) => x >= Math.min(R[0][0], R[1][0]) && x <= Math.max(R[0][0], R[1][0]) && y >= Math.min(R[0][1], R[1][1]) && y <= Math.max(R[0][1], R[1][1]));
     for (let L = 0; L < 2; L++) {
       g.globalAlpha = L > st.layer ? .45 : 1;  // le calque du dessus pâlit quand tu peins le sol
-      for (let i = 0; i < m.w * m.h; i++) { const x = i % m.w, y = i / m.w | 0; let v = m.l[L][i]; if (inR && L === st.layer && inR(x, y)) v = st.btn === 2 ? 0 : st.tile; if (v) g.drawImage(TILES[v - 1].c, x * TS, y * TS); }
+      const SL = L === 0 && inR && st.layer === 0 ? m.l[0].map((v, i) => inR(i % m.w, i / m.w | 0) ? (st.btn === 2 ? 0 : st.tile) : v) : m.l[L];
+      for (let i = 0; i < m.w * m.h; i++) { const x = i % m.w, y = i / m.w | 0; let v = SL[i]; if (inR && L === st.layer && inR(x, y)) v = st.btn === 2 ? 0 : st.tile; if (v) g.drawImage(TILES[v - 1].c, x * TS, y * TS);
+        if (L === 0 && v) for (const e of edgesAt(m, SL, i)) g.drawImage(ov(e.v, e.d), x * TS, y * TS); }
     }
     g.globalAlpha = 1;
     if (st.grid) { g.fillStyle = 'rgba(255,255,255,.09)'; for (let x = 1; x < m.w; x++) g.fillRect(x * TS, 0, 1, H); for (let y = 1; y < m.h; y++) g.fillRect(0, y * TS, W, 1); }
@@ -474,13 +506,14 @@ export default async function (ctx) {
   const TOOLS = [['pen', 'CRAYON', 'p'], ['fill', 'REMPLIR', 'f'], ['rect', 'RECTANGLE', 'r'], ['erase', 'GOMME', 'e'], ['pick', 'PIPETTE', 'i']];
   function bar() {
     const b = (label, on, key, f) => { const x = el('button', 'btn' + (on ? ' main' : ''), label); x.title = 'Touche ' + key; x.onclick = f; return x; };
-    $('tmTools').replaceChildren(...TOOLS.map(([id, n, k]) => b(n, st.tool === id, k.toUpperCase(), () => setTool(id))), b('GRILLE', st.grid, 'G', () => { st.grid = !st.grid; bar(); draw(); }));
+    $('tmTools').replaceChildren(...TOOLS.map(([id, n, k]) => b(n, st.tool === id, k.toUpperCase(), () => setTool(id))), b('GRILLE', st.grid, 'G', () => { st.grid = !st.grid; bar(); draw(); }), b('BORDS AUTO', autoOn(map()), 'A', toggleAuto));
     $('tmLayers').replaceChildren(...['SOL', 'OBJETS'].map((n, i) => b(n, st.layer === i, i + 1, () => { st.layer = i; bar(); draw(); })));
   }
   const setTool = t => { st.tool = t; bar(); };
+  const toggleAuto = () => { const m = map(); m.auto = !autoOn(m); keep(); bar(); draw(); toast(m.auto ? 'Bords automatiques : les sols se raccordent tout seuls' : 'Bords automatiques coupés : tuiles brutes'); };
   function select(t) { st.tile = t; st.layer = TILES[t - 1].obj ? 1 : 0; if (st.tool === 'erase' || st.tool === 'pick') st.tool = 'pen'; bar(); drawPal(); draw(); }
   function maps() { $('tmMaps').replaceChildren(...data.maps.map((m, i) => { const o = el('option', '', m.name + ' (' + m.w + ' × ' + m.h + ')'); o.value = i; o.selected = i === data.cur; return o; })); }
-  const switchTo = i => { data.cur = i; st.undo = []; st.redo = []; maps(); keep(); fit(); draw(); };
+  const switchTo = i => { data.cur = i; st.undo = []; st.redo = []; maps(); keep(); bar(); fit(); draw(); };
 
   // dessin à la souris (et au stylet / doigt)
   const cell = e => { const b = cv.getBoundingClientRect(), m = map(), x = Math.floor((e.clientX - b.left) / b.width * m.w), y = Math.floor((e.clientY - b.top) / b.height * m.h); return x >= 0 && y >= 0 && x < m.w && y < m.h ? [x, y] : null; };
@@ -516,6 +549,7 @@ export default async function (ctx) {
     if (e.ctrlKey || e.altKey) return;
     const t = TOOLS.find(x => x[2] === k); if (t) setTool(t[0]);
     else if (k === 'g') { st.grid = !st.grid; bar(); draw(); }
+    else if (k === 'a') toggleAuto();
     else if (k === '1' || k === '2') { st.layer = +k - 1; bar(); draw(); }
   });
 
@@ -528,13 +562,23 @@ export default async function (ctx) {
   // exports
   const download = (href, name) => { const a = el('a'); a.href = href; a.download = name; document.body.append(a); a.click(); a.remove(); };
   const fname = () => map().name.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^\w-]+/g, '_') || 'carte';
-  function picture() { const m = map(), c = document.createElement('canvas'); c.width = m.w * TS; c.height = m.h * TS; const x = c.getContext('2d'); for (const L of m.l) L.forEach((v, i) => v && x.drawImage(TILES[v - 1].c, i % m.w * TS, (i / m.w | 0) * TS)); return c; }
-  function sheet() { const c = document.createElement('canvas'), cols = 8; c.width = cols * TS; c.height = Math.ceil(TILES.length / cols) * TS; const x = c.getContext('2d'); TILES.forEach((t, i) => x.drawImage(t.c, i % cols * TS, (i / cols | 0) * TS)); return c; }
-  const tiled = (m, s) => ({ type: 'map', version: '1.10', tiledversion: '1.10.2', orientation: 'orthogonal', renderorder: 'right-down', width: m.w, height: m.h, tilewidth: TS, tileheight: TS, infinite: false, nextlayerid: 3, nextobjectid: 1,
-    layers: ['Sol', 'Objets'].map((name, i) => ({ id: i + 1, name, type: 'tilelayer', width: m.w, height: m.h, x: 0, y: 0, opacity: 1, visible: true, data: m.l[i].slice() })),
-    tilesets: [{ firstgid: 1, name: 'neodex', image: 'tuiles-neodex.png', imagewidth: s.width, imageheight: s.height, tilewidth: TS, tileheight: TS, tilecount: TILES.length, columns: s.width / TS, margin: 0, spacing: 0 }] });
+
+  // le sol avec ses bords en tuiles composées (numérotées après la planche) : Tiled montre la même carte que NeoDex
+  function bake(m) {
+    const keys = new Map(), extra = [], ground = m.l[0].map((v, i) => { const es = v ? edgesAt(m, m.l[0], i) : []; if (!es.length) return v;
+      const k = v + ':' + es.map(e => e.v + '.' + e.d).join(',');
+      if (!keys.has(k)) { const c = document.createElement('canvas'); c.width = c.height = TS; const x = c.getContext('2d'); x.drawImage(TILES[v - 1].c, 0, 0); for (const e of es) x.drawImage(ov(e.v, e.d), 0, 0); extra.push(c); keys.set(k, TILES.length + extra.length); }
+      return keys.get(k); });
+    return { extra, ground };
+  }
+  function picture() { const m = map(), { extra, ground } = bake(m), all = [...TILES.map(t => t.c), ...extra], c = document.createElement('canvas'); c.width = m.w * TS; c.height = m.h * TS; const x = c.getContext('2d');
+    for (const L of [ground, m.l[1]]) L.forEach((v, i) => v && x.drawImage(all[v - 1], i % m.w * TS, (i / m.w | 0) * TS)); return c; }
+  function sheet(extra = []) { const all = [...TILES.map(t => t.c), ...extra], c = document.createElement('canvas'), cols = 8; c.width = cols * TS; c.height = Math.ceil(all.length / cols) * TS; const x = c.getContext('2d'); all.forEach((t, i) => x.drawImage(t, i % cols * TS, (i / cols | 0) * TS)); return c; }
+  const tiled = (m, s, ground = m.l[0], n = TILES.length) => ({ type: 'map', version: '1.10', tiledversion: '1.10.2', orientation: 'orthogonal', renderorder: 'right-down', width: m.w, height: m.h, tilewidth: TS, tileheight: TS, infinite: false, nextlayerid: 3, nextobjectid: 1,
+    layers: ['Sol', 'Objets'].map((name, i) => ({ id: i + 1, name, type: 'tilelayer', width: m.w, height: m.h, x: 0, y: 0, opacity: 1, visible: true, data: (i ? m.l[1] : ground).slice() })),
+    tilesets: [{ firstgid: 1, name: 'neodex', image: 'tuiles-neodex.png', imagewidth: s.width, imageheight: s.height, tilewidth: TS, tileheight: TS, tilecount: n, columns: s.width / TS, margin: 0, spacing: 0 }] });
   $('tmPng').onclick = () => { download(picture().toDataURL('image/png'), fname() + '.png'); toast('Image de la carte enregistrée dans tes téléchargements.'); };
-  $('tmJson').onclick = () => { const s = sheet(); download(URL.createObjectURL(new Blob([JSON.stringify(tiled(map(), s))], { type: 'application/json' })), fname() + '.tmj');
+  $('tmJson').onclick = () => { const m = map(), { extra, ground } = bake(m), s = sheet(extra); download(URL.createObjectURL(new Blob([JSON.stringify(tiled(m, s, ground, TILES.length + extra.length))], { type: 'application/json' })), fname() + '.tmj');
     setTimeout(() => download(s.toDataURL('image/png'), 'tuiles-neodex.png'), 400); toast('Carte (.tmj) et planche de tuiles enregistrées dans tes téléchargements : garde-les dans le même dossier.'); };
 
   {  // vérification : remplissage, rectangle, tuiles nettes (sol opaque, objets détourés), export au format Tiled
@@ -546,10 +590,14 @@ export default async function (ctx) {
     for (const k of ['nature', 'grotte', 'ville', 'neige']) { const n = TILES.filter(t => t.sets.includes(k)); if (n.filter(t => t.obj).length < 5 || n.filter(t => !t.obj).length < 4) bad.push('jeu ' + k); }
     if (TILES[16].name !== 'Arbre' || TILES[31].name !== 'Fenêtre' || TILES.length < 50) bad.push('numéros des tuiles');  // les cartes déjà faites gardent les leurs
     const s = tiled(blank('t', 2, 2), { width: 128, height: 64 }); if (s.layers[1].data.length !== 4 || s.tilesets[0].tilecount !== TILES.length || s.tilesets[0].columns !== 8) bad.push('export');
+    { const W = TILES.findIndex(t => t.name === 'Eau') + 1, S = TILES.findIndex(t => t.name === 'Sable') + 1, m = { w: 3, h: 3, l: [[W, W, W, W, S, W, W, W, W], Array(9).fill(0)] };
+      const n = tmEdges(m.l[0], 3, 3, 1, RANK), c = tmEdges(m.l[0], 3, 3, 0, RANK), mid = tmEdges(m.l[0], 3, 3, 4, RANK), bk = bake(m);
+      if (n.length !== 1 || n[0].d !== 2 || c.length !== 1 || c[0].d !== 5 || mid.length || bk.extra.length !== 8 || bk.ground[4] !== S) bad.push('bords auto');
+      m.auto = false; if (bake(m).extra.length) bad.push('bords auto coupés'); }
     console.assert(!bad.length, 'tilemap', bad); view.dataset.selfcheck = bad.join(' | ') || 'ok';
   }
   maps(); bar(); drawPal(); draw();
   addEventListener('resize', fit);
   ctx.onOpen(() => { fit(); draw(); });
-  cv.__t = { map, st, tiles: TILES.length, firstObj: TILES.findIndex(t => t.obj), pc: PC, at: n => vis.indexOf(n), sets: k => { st.set = k; drawPal(); return vis.length; } };
+  cv.__t = { map, st, bake, edges: i => edgesAt(map(), map().l[0], i).length, tiles: TILES.length, firstObj: TILES.findIndex(t => t.obj), pc: PC, at: n => vis.indexOf(n), sets: k => { st.set = k; drawPal(); return vis.length; } };
 }

@@ -9,7 +9,15 @@ A tile map editor for your 2D games.
 - Several maps from 16×12 to 64×40, saved as you go.
 - **PNG export**, and **Tiled export** (`.tmj` + its tile sheet) for Tiled, Godot, Phaser, LDtk…
 
-Shortcuts: P pencil · F fill · R rectangle · E eraser · I picker · G grid · 1 and 2: layer.
+Shortcuts: P pencil · F fill · R rectangle · E eraser · I picker · G grid · A auto edges · 1 and 2: layer.
+
+## Auto edges (new in 1.2.0)
+
+Grounds join up by themselves: grass over dirt, sand over water, jagged shores and closed corners, also in PNG and Tiled exports.
+
+## Auto edges (1.2.0)
+
+The **AUTO EDGES** button (key A) joins grounds by themselves: grass spills over dirt and path, sand over water, water over deep water, with a jagged edge and a small shadow; corners close too. Built grounds (paving, bricks, walls, roof…) stay sharp. The setting is kept per map. PNG export shows the edges, and Tiled export adds a composed tile to the sheet for each edge cell: Tiled shows the same map.
 
 ## Tile sets
 
